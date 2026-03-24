@@ -1,0 +1,141 @@
+---
+title: "English Premier League Stats (2021-2025)"
+author: "Mike May, Jessica Vescera, Melina Rodriguez, Frank Zawacki"
+date: "2026-03-24"
+output:
+  html_document: default
+  pdf_document: default
+---
+Introduction:
+This project explores match performance in the English Premier League from 2021 to 2024. The goal is to analyze home field advantage, team performance metrics, and match outcomes using descriptive statistics and visualizations.
+
+##Load Data
+```{r setup, include=FALSE}
+library(readr)
+data <- read.csv("Documents/mydata.csv", header= FALSE, stringsAsFactors= FALSE)
+head(data)
+```
+
+##Fix Column Names
+```{r}
+
+#Use first row as column names
+colnames(data) <- data[1, ]
+
+#Remove first row from dataset 
+data <- data[-1, ]
+
+#Reset row names 
+rownames(data) <- NULL
+
+# Clean column names 
+names(data) <- make.names(names(data))
+
+# Check updated structure
+str(data)
+```
+
+#Convert Data Types
+```{r}
+# Convert key columns to numeric
+data$Goals.Home <- as.numeric(data$Goals.Home)
+data$Away.Goals <- as.numeric(data$Away.Goals)
+data$home_shots <- as.numeric(data$home_shots)
+data$away_shots <- as.numeric(data$away_shots)
+data$home_possessions <- as.numeric(data$home_possessions)
+data$away_possessions <- as.numeric(data$away_possessions)
+
+# Fix attendance (remove commas, then convert)
+data$attendance <- as.numeric(gsub(",", "", data$attendance))
+```
+
+##Create Match Outcome Variables
+
+
+```{r pressure, echo=FALSE}
+#Home Win, Away Win, Draw
+data$result <- ifelse(data$Goals.Home > data$Away.Goals, "Home Win",
+                      ifelse(data$Goals.Home < data$Away.Goals, "Away Win", "Draw"))
+
+table(data$result)
+```
+
+##Home Vs Away Win Percentage
+```{r}
+# Count results
+result_counts <- table(data$result)
+
+# Convert to percentages
+result_percent <- prop.table(result_counts) * 100
+
+# Print results
+print(result_counts)
+print(result_percent)
+```
+```{r}
+barplot(table(data$result),
+        main = "Match Outcomes",
+        col = c("green", "red", "gray"))
+```
+Interpretation:
+
+The bar chart shows the distribution of match outcomes across the dataset. Home wins appear to occur more frequently than away wins and draws, which suggests a potential home-field advantage in the Premier League during this period.
+Away wins are still fairly common, indicating that away teams remain competitive, but they do not occur as often as home wins. Draws are the least frequent outcome, showing that most matches tend to produce a clear winner rather than ending evenly.
+Overall, this pattern supports the idea that playing at home may provide a slight advantage, but matches are still relatively competitive across all outcomes.
+
+
+##Goal Analysis 
+```{r}
+mean(data$Goals.Home, na.rm = TRUE)
+mean(data$Away.Goals, na.rm = TRUE)
+```
+
+```{r}
+boxplot(data$Goals.Home, data$Away.Goals,
+        names = c("Home Goals", "Away Goals"),
+        main = "Goals Scored: Home vs Away",
+        ylab = "Goals")
+```
+
+
+Interpretation:
+
+This boxplot compares goals scored at home vs away.
+Home and away teams look pretty similar overall. The median number of goals is close for both, but home teams appear to score slightly more on average. The spread (IQR) is also similar, meaning the variability in goals is about the same in both cases.
+Both groups have a few outliers, especially on the higher end, showing that in some matches teams scored a lot more goals than usual. However, these are rare and don’t change the overall pattern much.
+Overall, the chart suggests a slight home advantage, but not a huge difference between home and away goal scoring.
+
+##Shots vs Goals
+```{r}
+plot(data$home_shots, data$Goals.Home,
+     main = "Home Shots vs Goals",
+     xlab = "Shots",
+     ylab = "Goals")
+```
+
+
+Interpretation:
+There’s a general upward trend showing that as home teams take more shots, they tend to score more goals. However, the spread of points shows that more shots don’t always guarantee more goals, so efficiency still matters.
+
+```{r}
+plot(data$away_shots, data$Away.Goals,
+     main = "Away Shots vs Goals",
+     xlab = "Shots",
+     ylab = "Goals")
+```
+
+
+Interpretation:
+Away teams also show a positive relationship between shots and goals, but the pattern looks slightly more spread out. This suggests that away teams may be a bit less consistent in converting chances compared to home teams.
+
+##Possession Analysis
+```{r}
+boxplot(home_possessions ~ result, data = data,
+        main = "Home Possession by Match Result",
+        xlab = "Match Result",
+        ylab = "Home Possession (%)")
+```
+
+
+Interpretation:
+Home teams tend to have higher possession in games they win compared to games they lose. However, the overlap between groups shows that possession alone doesn’t determine the outcome, and other factors like finishing and defense also play a role.
