@@ -1,4 +1,3 @@
-# Analyzing-Match-Performance-and-Home-Advantage-in-the-English-Premier-League-2021-2024
 # Project Proposal
 
 Michael May, Jessica Vescera, Frank Zawacki, Melina Rodriguez  
