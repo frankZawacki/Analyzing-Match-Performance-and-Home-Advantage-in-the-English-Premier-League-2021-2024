@@ -2,18 +2,20 @@
 title: "English Premier League Stats (2021-2025)"
 author: "Mike May, Jessica Vescera, Melina Rodriguez, Frank Zawacki"
 date: "2026-03-24"
-output:
-  html_document: default
-  pdf_document: default
+output: html_document
 ---
 Introduction:
 This project explores match performance in the English Premier League from 2021 to 2024. The goal is to analyze home field advantage, team performance metrics, and match outcomes using descriptive statistics and visualizations.
+
+
+
 
 ##Load Data
 ```{r setup, include=FALSE}
 library(readr)
 data <- read.csv("Documents/mydata.csv", header= FALSE, stringsAsFactors= FALSE)
 head(data)
+
 ```
 
 ##Fix Column Names
@@ -139,3 +141,59 @@ boxplot(home_possessions ~ result, data = data,
 
 Interpretation:
 Home teams tend to have higher possession in games they win compared to games they lose. However, the overlap between groups shows that possession alone doesn’t determine the outcome, and other factors like finishing and defense also play a role.
+
+##Random Forest Model
+```{r}
+# Load package
+library(randomForest)
+
+# Make sure result is a factor
+data$result <- as.factor(data$result)
+
+# Select variables
+model_data <- data[, c("result",
+                       "home_shots", "away_shots",
+                       "home_possessions", "away_possessions")]
+
+# Convert to numeric (safety)
+model_data$home_shots <- as.numeric(model_data$home_shots)
+model_data$away_shots <- as.numeric(model_data$away_shots)
+model_data$home_possessions <- as.numeric(model_data$home_possessions)
+model_data$away_possessions <- as.numeric(model_data$away_possessions)
+
+# Remove missing values
+model_data <- na.omit(model_data)
+
+# Create "advantage" variables
+model_data$shot_diff <- model_data$home_shots - model_data$away_shots
+model_data$possession_diff <- model_data$home_possessions - model_data$away_possessions
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Train/test split (70/30)
+train_index <- sample(1:nrow(model_data), 0.7 * nrow(model_data))
+
+train_data <- model_data[train_index, ]
+test_data  <- model_data[-train_index, ]
+
+# Train Random Forest model
+rf_model <- randomForest(result ~ ., data = train_data, ntree = 100)
+
+# Model summary
+print(rf_model)
+
+# Predictions
+predictions <- predict(rf_model, test_data)
+
+# Confusion matrix
+table(Predicted = predictions, Actual = test_data$result)
+
+# Variable importance
+varImpPlot(rf_model)
+```
+
+
+
+Variable Importance Interpretation:
+The variable importance plot from the random forest model shows that shot differential is the most important factor in predicting match outcomes. This suggests that the difference in shots between the home and away team is more informative than the total number of shots alone. Possession-related variables also contribute to the model, but to a lesser extent. Overall, the results indicate that relative performance between teams, rather than individual statistics, plays a key role in determining match results.
