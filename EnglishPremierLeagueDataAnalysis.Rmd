@@ -15,7 +15,7 @@ This project explores match performance in the English Premier League from 2021 
 library(readr)
 data <- read.csv("Documents/mydata.csv", header= FALSE, stringsAsFactors= FALSE)
 head(data)
-
+data
 ```
 
 ##Fix Column Names
@@ -143,57 +143,115 @@ Interpretation:
 Home teams tend to have higher possession in games they win compared to games they lose. However, the overlap between groups shows that possession alone doesn’t determine the outcome, and other factors like finishing and defense also play a role.
 
 ##Random Forest Model
+
+
 ```{r}
-# Load package
+# Load packages
 library(randomForest)
 
-# Make sure result is a factor
-data$result <- as.factor(data$result)
+# Create binary outcome (Home Win = 1, else 0)
+data$home_win_binary <- ifelse(data$result == "Home Win", 1, 0)
+data$home_win_binary <- as.factor(data$home_win_binary)
 
-# Select variables
-model_data <- data[, c("result",
-                       "home_shots", "away_shots",
-                       "home_possessions", "away_possessions")]
+# Select features
+features <- data[, c("home_possessions",
+                     "away_possessions",
+                     "home_shots",
+                     "away_shots",
+                     "home_fouls",
+                     "away_fouls",
+                     "home_corners",
+                     "away_corners",
+                     "attendance")]
 
-# Convert to numeric (safety)
-model_data$home_shots <- as.numeric(model_data$home_shots)
-model_data$away_shots <- as.numeric(model_data$away_shots)
-model_data$home_possessions <- as.numeric(model_data$home_possessions)
-model_data$away_possessions <- as.numeric(model_data$away_possessions)
+# Convert to numeric where needed
+features$home_possessions <- as.numeric(features$home_possessions)
+features$away_possessions <- as.numeric(features$away_possessions)
+features$home_shots <- as.numeric(features$home_shots)
+features$away_shots <- as.numeric(features$away_shots)
+features$home_fouls <- as.numeric(features$home_fouls)
+features$away_fouls <- as.numeric(features$away_fouls)
+features$home_corners <- as.numeric(features$home_corners)
+features$away_corners <- as.numeric(features$away_corners)
+features$attendance <- as.numeric(gsub(",", "", features$attendance))
 
 # Remove missing values
-model_data <- na.omit(model_data)
+model_data <- na.omit(cbind(features, home_win_binary = data$home_win_binary))
 
-# Create "advantage" variables
-model_data$shot_diff <- model_data$home_shots - model_data$away_shots
-model_data$possession_diff <- model_data$home_possessions - model_data$away_possessions
+# Split into X and y
+X <- model_data[, -ncol(model_data)]
+y <- model_data$home_win_binary
 
-# Set seed for reproducibility
-set.seed(123)
+# Train/test split (80/20)
+set.seed(42)
+train_index <- sample(1:nrow(model_data), 0.8 * nrow(model_data))
 
-# Train/test split (70/30)
-train_index <- sample(1:nrow(model_data), 0.7 * nrow(model_data))
-
-train_data <- model_data[train_index, ]
-test_data  <- model_data[-train_index, ]
+X_train <- X[train_index, ]
+X_test  <- X[-train_index, ]
+y_train <- y[train_index]
+y_test  <- y[-train_index]
 
 # Train Random Forest model
-rf_model <- randomForest(result ~ ., data = train_data, ntree = 100)
-
-# Model summary
-print(rf_model)
+rf_model <- randomForest(x = X_train, y = y_train,
+                         ntree = 100)
 
 # Predictions
-predictions <- predict(rf_model, test_data)
+y_pred <- predict(rf_model, X_test)
 
-# Confusion matrix
-table(Predicted = predictions, Actual = test_data$result)
+# Accuracy
+accuracy <- sum(y_pred == y_test) / length(y_test)
+print(paste("Accuracy:", round(accuracy, 3)))
 
-# Variable importance
+# Confusion Matrix
+cm <- table(Predicted = y_pred, Actual = y_test)
+print("Confusion Matrix:")
+print(cm)
+
+# Feature Importance
+importance_vals <- importance(rf_model)
+print("Feature Importance:")
+print(importance_vals)
+
+# Plot Feature Importance
 varImpPlot(rf_model)
+
+
+# Get importance values
+importance_vals <- importance(rf_model)
+
+# Convert to data frame
+importance_df <- data.frame(
+  feature = rownames(importance_vals),
+  importance = importance_vals[,1]
+)
+
+# Order by importance (largest first)
+importance_df <- importance_df[order(importance_df$importance, decreasing = TRUE), ]
+
+# Bar plot
+barplot(importance_df$importance,
+        names.arg = importance_df$feature,
+        las = 2,  # makes labels vertical
+        col = "steelblue",
+        main = "Feature Importance - Random Forest",
+        ylab = "Importance")
+
+
+
+library(ggplot2)
+
+cm_df <- as.data.frame(cm)
+
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq)) +
+  labs(title = "Confusion Matrix - Random Forest") +
+  theme_minimal()
 ```
 
+Random Forest Interpretation:
+The random forest results show that variables like attendance and shots, particularly away shots, are among the most important in predicting whether the home team wins. Possession also contributes to the model, while fouls and corners appear to have less influence. This suggests that attacking activity and overall game intensity play a larger role in determining match outcomes.
 
+The confusion matrix indicates that the model has moderate predictive performance. While it correctly classifies some outcomes, there are still a number of misclassifications. In particular, the model tends to predict “no home win” more frequently, which leads to missed home win predictions.
 
-Variable Importance Interpretation:
-The variable importance plot from the random forest model shows that shot differential is the most important factor in predicting match outcomes. This suggests that the difference in shots between the home and away team is more informative than the total number of shots alone. Possession-related variables also contribute to the model, but to a lesser extent. Overall, the results indicate that relative performance between teams, rather than individual statistics, plays a key role in determining match results.
+Overall, the model captures some meaningful patterns in the data, but its accuracy is limited. This suggests that adding more relevant features or further refining the model could help improve its performance.
