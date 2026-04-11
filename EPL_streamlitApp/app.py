@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 from scipy import stats
-import statsmodels.api as sm
+# import statsmodels.api as sm
 
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
