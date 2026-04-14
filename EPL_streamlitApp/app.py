@@ -552,6 +552,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
 # -------------------------
 # Tab 1: Home Advantage
 # -------------------------
+# -------------------------
 with tab1:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Matches", f"{len(dff):,}")
@@ -569,209 +570,131 @@ with tab1:
     st.pyplot(fig)
 
     st.subheader("Outcome Rates (Home Win / Draw / Away Win)")
-    rates = dff["match_result"].value_counts(normalize=True).reindex(["Home Win", "Draw", "Away Win"]).fillna(0)
+    rates = (
+        dff["match_result"]
+        .value_counts(normalize=True)
+        .reindex(["Home Win", "Draw", "Away Win"])
+        .fillna(0)
+    )
     fig2 = plt.figure(figsize=(6, 4))
     plt.bar(rates.index, rates.values)
     plt.ylim(0, 1)
     plt.ylabel("Proportion")
+    plt.title("Overall Match Outcome Rates")
     plt.tight_layout()
     st.pyplot(fig2)
-    
-    st.markdown("### Outcome counts by year (H/D/A)")
+
+    st.markdown("### Match outcomes by year (H/D/A)")
 
     if {"year", "outcome_hda"}.issubset(dff.columns):
         tmp = dff.dropna(subset=["year", "outcome_hda"]).copy()
-        tmp["year"] = tmp["year"].astype(int)
 
-        counts = (
-            tmp.groupby(["year", "outcome_hda"])
-            .size()
-            .unstack(fill_value=0)
-            .reindex(columns=["H", "D", "A"], fill_value=0)
-            .sort_index()
-        )
+        if len(tmp) == 0:
+            st.info("No year/outcome data available under current filters.")
+        else:
+            tmp["year"] = tmp["year"].astype(int)
 
-        years = counts.index.tolist()
-        x = np.arange(len(years))
-        w = 0.25
+            counts = (
+                tmp.groupby(["year", "outcome_hda"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(columns=["H", "D", "A"], fill_value=0)
+                .sort_index()
+            )
 
-        fig = plt.figure(figsize=(9, 4))
-        plt.bar(x - w, counts["H"].values, width=w, label="H")
-        plt.bar(x,      counts["D"].values, width=w, label="D")
-        plt.bar(x + w,  counts["A"].values, width=w, label="A")
-        plt.xticks(x, years)
-        plt.ylabel("Number of matches")
-        plt.title("Match outcomes by year (counts)")
-        plt.legend()
-        plt.tight_layout()
-        st.pyplot(fig)
+            mode = st.radio(
+                "Display yearly outcomes as",
+                ["Counts", "Proportions"],
+                horizontal=True,
+                key="tab1_outcome_mode"
+            )
+
+            years = counts.index.tolist()
+            x = np.arange(len(years))
+            w = 0.25
+
+            if mode == "Proportions":
+                plot_tbl = counts.div(counts.sum(axis=1), axis=0)
+                ylabel = "Proportion of matches"
+                ylim = (0, 1)
+                title = "Match outcomes by year (proportions)"
+            else:
+                plot_tbl = counts
+                ylabel = "Number of matches"
+                ylim = None
+                title = "Match outcomes by year (counts)"
+
+            fig3 = plt.figure(figsize=(10, 4))
+            plt.bar(x - w, plot_tbl["H"].values, width=w, label="H")
+            plt.bar(x,      plot_tbl["D"].values, width=w, label="D")
+            plt.bar(x + w,  plot_tbl["A"].values, width=w, label="A")
+            plt.xticks(x, years)
+            plt.ylabel(ylabel)
+            plt.title(title)
+            if ylim is not None:
+                plt.ylim(*ylim)
+            plt.legend()
+            plt.tight_layout()
+            st.pyplot(fig3)
+
+            st.dataframe(counts, use_container_width=True)
     else:
         st.info("Need year and outcome_hda to draw the grouped outcome chart.")
-        
-        st.markdown("### Outcome proportions by year (H/D/A)")
 
-    props = counts.div(counts.sum(axis=1), axis=0)
-
-    fig = plt.figure(figsize=(9, 4))
-    plt.bar(x - w, props["H"].values, width=w, label="H")
-    plt.bar(x,      props["D"].values, width=w, label="D")
-    plt.bar(x + w,  props["A"].values, width=w, label="A")
-    plt.xticks(x, years)
-    plt.ylim(0, 1)
-    plt.ylabel("Proportion of matches")
-    plt.title("Match outcomes by year (proportions)")
-    plt.legend()
-    plt.tight_layout()
-    st.pyplot(fig)
-
-    st.caption("These are descriptive summaries (association, not causation).")
-    
-    st.markdown("### Match outcomes by year (H/D/A)")
-
-    if {"calendar_year", "outcome_hda"}.issubset(dff.columns):
-        tmp = dff.dropna(subset=["calendar_year", "outcome_hda"]).copy()
-        tmp["calendar_year"] = tmp["calendar_year"].astype(int)
-
-        counts = (
-            tmp.groupby(["calendar_year", "outcome_hda"])
-            .size()
-            .unstack(fill_value=0)
-            .reindex(columns=["H", "D", "A"], fill_value=0)
-            .sort_index()
-        )
-
-        mode = st.radio("Display as", ["Counts", "Proportions"], horizontal=True)
-
-        years = counts.index.tolist()
-        x = np.arange(len(years))
-        w = 0.25
-
-        if mode == "Proportions":
-            plot_tbl = counts.div(counts.sum(axis=1), axis=0)
-            ylabel = "Proportion of matches"
-            ylim = (0, 1)
-            title = "Match outcomes by year (proportions)"
-        else:
-            plot_tbl = counts
-            ylabel = "Number of matches"
-            ylim = None
-            title = "Match outcomes by year (counts)"
-
-        fig = plt.figure(figsize=(10, 4))
-        plt.bar(x - w, plot_tbl["H"].values, width=w, label="H")
-        plt.bar(x,      plot_tbl["D"].values, width=w, label="D")
-        plt.bar(x + w,  plot_tbl["A"].values, width=w, label="A")
-        plt.xticks(x, years)
-        plt.ylabel(ylabel)
-        plt.title(title)
-        if ylim is not None:
-            plt.ylim(*ylim)
-        plt.legend()
-        plt.tight_layout()
-        st.pyplot(fig)
-
-    else:
-        st.info("Need calendar_year and outcome_hda to draw the grouped outcome chart.")
-        
     st.markdown("### Closed doors vs with crowd (COVID context)")
 
-needed = {"closed_doors", "home_win_binary", "goal_diff"}
-if needed.issubset(dff.columns):
-    tmp = dff.dropna(subset=list(needed)).copy()
-    tmp["closed_doors"] = tmp["closed_doors"].astype(int)
+    needed = {"closed_doors", "home_win_binary", "goal_diff"}
+    if needed.issubset(dff.columns):
+        tmp = dff.dropna(subset=list(needed)).copy()
+        tmp["closed_doors"] = tmp["closed_doors"].astype(int)
 
-    # If the filter results in only one group, show a friendly message
-    if tmp["closed_doors"].nunique() < 2:
-        st.info("Current filters include only one attendance condition (all closed-doors or all with-crowd). Select more years to compare both.")
+        if tmp["closed_doors"].nunique() < 2:
+            st.info(
+                "Current filters include only one attendance condition "
+                "(all closed doors or all with crowd). Select more years to compare both."
+            )
+        else:
+            summary = (
+                tmp.groupby("closed_doors")
+                .agg(
+                    n=("home_win_binary", "size"),
+                    home_win_rate=("home_win_binary", "mean"),
+                    avg_goal_diff=("goal_diff", "mean"),
+                )
+                .sort_index()
+            )
+
+            labels = ["Closed doors\n(attendance = 0)", "With crowd\n(attendance > 0)"]
+            home_win_rates = [summary.loc[1, "home_win_rate"], summary.loc[0, "home_win_rate"]]
+            goal_diffs = [summary.loc[1, "avg_goal_diff"], summary.loc[0, "avg_goal_diff"]]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                fig4 = plt.figure(figsize=(6, 4))
+                plt.bar(labels, home_win_rates)
+                plt.ylim(0, 1)
+                plt.ylabel("Home win rate")
+                plt.title("Home win rate")
+                plt.tight_layout()
+                st.pyplot(fig4)
+
+            with col2:
+                fig5 = plt.figure(figsize=(6, 4))
+                plt.bar(labels, goal_diffs)
+                plt.axhline(0, linewidth=1)
+                plt.ylabel("Avg goal diff (Home - Away)")
+                plt.title("Average goal difference")
+                plt.tight_layout()
+                st.pyplot(fig5)
+
+            st.dataframe(summary, use_container_width=True)
     else:
-        summary = (
-            tmp.groupby("closed_doors")
-               .agg(
-                   n=("home_win_binary", "size"),
-                   home_win_rate=("home_win_binary", "mean"),
-                   avg_goal_diff=("goal_diff", "mean")
-               )
-        )
+        st.info("Need closed_doors, home_win_binary, and goal_diff to draw this comparison.")
 
-        labels = ["Closed doors\n(attendance=0)", "With crowd\n(attendance>0)"]
-        home_win_rates = [summary.loc[1, "home_win_rate"], summary.loc[0, "home_win_rate"]]
-        goal_diffs = [summary.loc[1, "avg_goal_diff"], summary.loc[0, "avg_goal_diff"]]
+    st.caption("These are descriptive summaries (association, not causation).")
 
-        c1, c2 = st.columns(2)
 
-        with c1:
-            fig1 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, home_win_rates)
-            plt.ylim(0, 1)
-            plt.ylabel("Home win rate")
-            plt.title("Home win rate")
-            plt.tight_layout()
-            st.pyplot(fig1)
-
-        with c2:
-            fig2 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, goal_diffs)
-            plt.axhline(0, linewidth=1)
-            plt.ylabel("Avg goal diff (Home - Away)")
-            plt.title("Average goal difference")
-            plt.tight_layout()
-            st.pyplot(fig2)
-
-        st.dataframe(summary, use_container_width=True)
-
-else:
-    st.info("Need closed_doors, home_win_binary, and goal_diff to draw this comparison.")
-    
-st.markdown("### Closed doors vs with crowd (COVID context)")
-
-needed = {"closed_doors", "home_win_binary", "goal_diff"}
-if needed.issubset(dff.columns):
-    tmp = dff.dropna(subset=list(needed)).copy()
-    tmp["closed_doors"] = tmp["closed_doors"].astype(int)
-
-    # If the filter results in only one group, show a friendly message
-    if tmp["closed_doors"].nunique() < 2:
-        st.info("Current filters include only one attendance condition (all closed-doors or all with-crowd). Select more years to compare both.")
-    else:
-        summary = (
-            tmp.groupby("closed_doors")
-               .agg(
-                   n=("home_win_binary", "size"),
-                   home_win_rate=("home_win_binary", "mean"),
-                   avg_goal_diff=("goal_diff", "mean")
-               )
-        )
-
-        labels = ["Closed doors\n(attendance=0)", "With crowd\n(attendance>0)"]
-        home_win_rates = [summary.loc[1, "home_win_rate"], summary.loc[0, "home_win_rate"]]
-        goal_diffs = [summary.loc[1, "avg_goal_diff"], summary.loc[0, "avg_goal_diff"]]
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            fig1 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, home_win_rates)
-            plt.ylim(0, 1)
-            plt.ylabel("Home win rate")
-            plt.title("Home win rate")
-            plt.tight_layout()
-            st.pyplot(fig1)
-
-        with c2:
-            fig2 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, goal_diffs)
-            plt.axhline(0, linewidth=1)
-            plt.ylabel("Avg goal diff (Home - Away)")
-            plt.title("Average goal difference")
-            plt.tight_layout()
-            st.pyplot(fig2)
-
-        st.dataframe(summary, use_container_width=True)
-
-else:
-    st.info("Need closed_doors, home_win_binary, and goal_diff to draw this comparison.")
-    
-    
 
 # -------------------------
 # Tab 2: Correlations + Heatmap
@@ -844,20 +767,23 @@ with tab2:
 with tab3:
     st.subheader("Attendance & Possession Checks (Association)")
 
-    exclude_closed = st.checkbox(
-        "Exclude closed-door matches (attendance = 0) for attendance analyses",
-        value=True
+    include_closed_doors = st.checkbox(
+        "Include closed-door matches (attendance = 0) in attendance boxplot",
+        value=False,
+        key="tab3_include_closed_doors"
     )
 
     att_df = dff.copy()
-    if "attendance" in att_df.columns and exclude_closed:
-        att_df = att_df[att_df["attendance"] > 0]
+    if "attendance" in att_df.columns:
+        att_df["attendance"] = pd.to_numeric(att_df["attendance"], errors="coerce")
+        if not include_closed_doors:
+            att_df = att_df[att_df["attendance"] > 0]
 
     c1, c2 = st.columns(2)
 
     with c1:
-        st.markdown("**Attendance vs Home Win (box/whisker)**")
-        if "attendance" in att_df.columns and pd.api.types.is_numeric_dtype(att_df["attendance"]):
+        st.markdown("**Attendance vs Home Win (boxplot)**")
+        if {"attendance", "home_win_binary"}.issubset(att_df.columns):
             win = att_df.loc[att_df["home_win_binary"] == 1, "attendance"].dropna()
             notwin = att_df.loc[att_df["home_win_binary"] == 0, "attendance"].dropna()
 
@@ -867,7 +793,10 @@ with tab3:
                 fig = plt.figure(figsize=(6, 4))
                 plt.boxplot([win.values, notwin.values], labels=["Home Win", "Not Home Win"])
                 plt.ylabel("Attendance")
-                plt.title("Attendance vs Home Win")
+                plt.title(
+                    "Attendance vs Home Win"
+                    + (" (including closed doors)" if include_closed_doors else " (excluding closed doors)")
+                )
                 plt.tight_layout()
                 st.pyplot(fig)
         else:
@@ -876,21 +805,21 @@ with tab3:
     with c2:
         st.markdown("**Possession diff vs Home Win (scatter)**")
         if "possession_diff" in dff.columns and pd.api.types.is_numeric_dtype(dff["possession_diff"]):
-            fig = plt.figure(figsize=(6, 4))
+            fig2 = plt.figure(figsize=(6, 4))
             plt.scatter(dff["possession_diff"], dff["home_win_binary"], alpha=0.25)
             plt.xlabel("Possession diff (home_possessions - away_possessions)")
             plt.ylabel("Home win (0/1)")
             plt.title("Possession diff vs Home Win")
             plt.tight_layout()
-            st.pyplot(fig)
+            st.pyplot(fig2)
         else:
             st.info("possession_diff not available under current filters.")
 
     st.caption(
-        "Note: These are associations. Attendance is confounded by team strength/popularity, and attendance=0 reflects COVID closed-door matches."     
+        "Note: These are associations. Attendance is confounded by team strength/popularity, "
+        "and attendance = 0 reflects COVID closed-door matches."
     )
-    
-                    # --- Possession (not diff) vs match outcome (boxplots)
+
     st.markdown("### Home/Away possession vs match outcome")
 
     needed = {"match_result", "home_possessions", "away_possessions"}
@@ -898,114 +827,48 @@ with tab3:
         pos_df = dff[list(needed)].dropna().copy()
 
         order = ["Home Win", "Draw", "Away Win"]
-        pos_df["match_result"] = pd.Categorical(pos_df["match_result"], categories=order, ordered=True)
-
-        # Home possession boxplot by outcome
-        fig = plt.figure(figsize=(7, 4))
-        data = [pos_df.loc[pos_df["match_result"] == k, "home_possessions"].values for k in order]
-        if all(len(x) > 1 for x in data):
-            plt.boxplot(data, labels=order)
-            plt.ylabel("Home possession")
-            plt.title("Home possession vs match outcome")
-            plt.tight_layout()
-            st.pyplot(fig)
-        else:
-            st.info("Not enough data for home possession boxplot under current filters.")
-
-        # Away possession boxplot by outcome
-        fig2 = plt.figure(figsize=(7, 4))
-        data2 = [pos_df.loc[pos_df["match_result"] == k, "away_possessions"].values for k in order]
-        if all(len(x) > 1 for x in data2):
-            plt.boxplot(data2, labels=order)
-            plt.ylabel("Away possession")
-            plt.title("Away possession vs match outcome")
-            plt.tight_layout()
-            st.pyplot(fig2)
-        else:
-            st.info("Not enough data for away possession boxplot under current filters.")
-    else:
-        st.info("Missing columns for possession charts (need match_result, home_possessions, away_possessions).")
-st.markdown("### Attendance vs Home Win (with/without closed doors)")
-if {"attendance", "home_win_binary"}.issubset(dff.columns):
-    tmp = dff.copy()
-    tmp["attendance"] = pd.to_numeric(tmp["attendance"], errors="coerce")
-
-    tmp_all = tmp.dropna(subset=["attendance", "home_win_binary"])
-    tmp_open = tmp_all[tmp_all["attendance"] > 0]
-
-    win_all = tmp_all.loc[tmp_all["home_win_binary"] == 1, "attendance"].values
-    notwin_all = tmp_all.loc[tmp_all["home_win_binary"] == 0, "attendance"].values
-
-    win_open = tmp_open.loc[tmp_open["home_win_binary"] == 1, "attendance"].values
-    notwin_open = tmp_open.loc[tmp_open["home_win_binary"] == 0, "attendance"].values
-
-    # Guard: avoid plotting if a group is empty
-    if len(win_all) < 2 or len(notwin_all) < 2:
-        st.info("Not enough data (including closed doors) to draw the boxplot under current filters.")
-    elif len(win_open) < 2 or len(notwin_open) < 2:
-        st.info("Not enough data (excluding closed doors) to draw the boxplot under current filters.")
-    else:
-        fig, axes = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
-
-        axes[0].boxplot([win_all, notwin_all], labels=["Home Win", "Not Home Win"])
-        axes[0].set_title("Including closed doors")
-        axes[0].set_ylabel("Attendance")
-
-        axes[1].boxplot([win_open, notwin_open], labels=["Home Win", "Not Home Win"])
-        axes[1].set_title("Excluding closed doors")
-
-        plt.tight_layout()
-        st.pyplot(fig)
-else:
-    st.info("Need attendance and home_win_binary to draw this chart.")
-    
-st.markdown("### Closed doors vs with crowd (COVID context)")
-
-needed = {"closed_doors", "home_win_binary", "goal_diff"}
-if needed.issubset(dff.columns):
-    tmp = dff.dropna(subset=list(needed)).copy()
-    tmp["closed_doors"] = tmp["closed_doors"].astype(int)
-
-    if tmp["closed_doors"].nunique() < 2:
-        st.info("Current filters include only one group (all closed doors or all with crowd). Select more years to compare both.")
-    else:
-        summary = (
-            tmp.groupby("closed_doors")
-               .agg(
-                   n=("home_win_binary", "size"),
-                   home_win_rate=("home_win_binary", "mean"),
-                   avg_goal_diff=("goal_diff", "mean")
-               )
+        pos_df["match_result"] = pd.Categorical(
+            pos_df["match_result"],
+            categories=order,
+            ordered=True
         )
 
-        labels = ["Closed doors\n(att=0)", "With crowd\n(att>0)"]
-        home_win_rates = [summary.loc[1, "home_win_rate"], summary.loc[0, "home_win_rate"]]
-        goal_diffs = [summary.loc[1, "avg_goal_diff"], summary.loc[0, "avg_goal_diff"]]
+        col3, col4 = st.columns(2)
 
-        c1, c2 = st.columns(2)
+        with col3:
+            data_home = [
+                pos_df.loc[pos_df["match_result"] == k, "home_possessions"].values
+                for k in order
+            ]
 
-        with c1:
-            fig1 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, home_win_rates)
-            plt.ylim(0, 1)
-            plt.ylabel("Home win rate")
-            plt.title("Home win rate")
-            plt.tight_layout()
-            st.pyplot(fig1)
+            if all(len(x) > 1 for x in data_home):
+                fig3 = plt.figure(figsize=(7, 4))
+                plt.boxplot(data_home, labels=order)
+                plt.ylabel("Home possession")
+                plt.title("Home possession vs match outcome")
+                plt.tight_layout()
+                st.pyplot(fig3)
+            else:
+                st.info("Not enough data for home possession boxplot under current filters.")
 
-        with c2:
-            fig2 = plt.figure(figsize=(6, 4))
-            plt.bar(labels, goal_diffs)
-            plt.axhline(0, linewidth=1)
-            plt.ylabel("Avg goal diff (Home−Away)")
-            plt.title("Average goal difference")
-            plt.tight_layout()
-            st.pyplot(fig2)
+        with col4:
+            data_away = [
+                pos_df.loc[pos_df["match_result"] == k, "away_possessions"].values
+                for k in order
+            ]
 
-        st.dataframe(summary, use_container_width=True)
-else:
-    st.info("Need closed_doors, home_win_binary, and goal_diff to draw this comparison.")
-            
+            if all(len(x) > 1 for x in data_away):
+                fig4 = plt.figure(figsize=(7, 4))
+                plt.boxplot(data_away, labels=order)
+                plt.ylabel("Away possession")
+                plt.title("Away possession vs match outcome")
+                plt.tight_layout()
+                st.pyplot(fig4)
+            else:
+                st.info("Not enough data for away possession boxplot under current filters.")
+    else:
+        st.info("Missing columns for possession charts (need match_result, home_possessions, away_possessions).")
+   
 
 # -------------------------
 # Tab 4: Association Tests
