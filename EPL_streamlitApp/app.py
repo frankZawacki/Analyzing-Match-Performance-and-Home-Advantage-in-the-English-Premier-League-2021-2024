@@ -925,9 +925,7 @@ with tab3:
             st.info("Not enough data for away possession boxplot under current filters.")
     else:
         st.info("Missing columns for possession charts (need match_result, home_possessions, away_possessions).")
-
 st.markdown("### Attendance vs Home Win (with/without closed doors)")
-
 if {"attendance", "home_win_binary"}.issubset(dff.columns):
     tmp = dff.copy()
     tmp["attendance"] = pd.to_numeric(tmp["attendance"], errors="coerce")
